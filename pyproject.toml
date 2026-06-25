@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "addix-gama"
+version = "0.1.0"
+description = "Autonomous continuous-testing and validation engine"
+readme = "README.md"
+dependencies = [
+    "fastapi",
+    "typer",
+    "pydantic-settings",
+    "reportlab",
+    "pytest",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["gama*"]
