@@ -48,9 +48,8 @@ def report():
     state_manager = StateManager()
     state_context = state_manager.run(evaluators)
 
-    markdown_content = generate_state_markdown(state_context)
-
-    generate_audit_report(markdown_content, "gama_audit_report.pdf")
+    # Pass the Pydantic StateContext model directly
+    generate_audit_report(state_context, "gama_audit_report.pdf")
 
     console.print("Creating PDF report...")
     console.print("[bold blue]Report generated successfully.[/bold blue]")

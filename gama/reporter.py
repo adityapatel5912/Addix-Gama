@@ -7,6 +7,8 @@ from reportlab.lib.units import inch
 from reportlab.lib.colors import HexColor
 import xml.sax.saxutils
 
+from gama.schema import StateContext
+
 class MarkdownParser:
     """Base class for Markdown parsers."""
     def can_parse(self, line: str) -> bool:
@@ -165,13 +167,37 @@ class MarkdownToPDFConverter:
 
         doc.build(story)
 
-def generate_audit_report(markdown_content: str, output_path: str):
+def generate_audit_report(state_context: StateContext, output_path: str):
     """
-    Generates a PDF audit report from markdown content.
+    Generates a PDF audit report from a StateContext Pydantic model.
+    """
 
-    Args:
-        markdown_content (str): The markdown string to convert.
-        output_path (str): The path where the PDF will be saved.
-    """
+    # We can still generate a markdown-like structure to feed into the existing converter,
+    # or build the story directly. Since MarkdownToPDFConverter exists and handles
+    # paragraph styles nicely, we will build a pristine markdown string from the Pydantic schema
+    # to feed it.
+
+    md_lines = []
+    md_lines.append("# Certification Report")
+    md_lines.append(f"**Overall Status:** {state_context.overall_status}")
+    md_lines.append("")
+    md_lines.append(f"**Success Rate:** {state_context.summary.success_rate * 100}%")
+    md_lines.append(f"**Passed:** {state_context.summary.passed} / **Total:** {state_context.summary.total}")
+    md_lines.append("")
+
+    if state_context.overall_status == "PASSED":
+        md_lines.append("## All Systems Go")
+        md_lines.append("No failures detected in the target project. The codebase is currently fully operational and production-ready.")
+    else:
+        md_lines.append("## Findings")
+        for err_info in state_context.aggregated_errors:
+            md_lines.append(f"### Category: {err_info.evaluator}")
+            for error in err_info.errors:
+                md_lines.append(f"- **{error.title}** ({error.severity}): {error.description}")
+                if error.file:
+                    md_lines.append(f"  - File: `{error.file}` (Line: {error.line})")
+                md_lines.append(f"  - Fix: {error.instructions}")
+            md_lines.append("")
+
     converter = MarkdownToPDFConverter(output_path)
-    converter.convert(markdown_content)
+    converter.convert("\n".join(md_lines))

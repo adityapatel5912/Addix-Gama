@@ -1,19 +1,20 @@
 import time
-from typing import List, Dict, Any, Protocol, Optional
+from typing import List, Dict, Any, Optional
+from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-import xml.sax.saxutils
 
-class EvaluatorProtocol(Protocol):
-    """Protocol defining the expected interface for an evaluator."""
-    @property
-    def name(self) -> str:
-        ...
+from gama.evaluators import BaseEvaluator
+from gama.schema import (
+    StateContext,
+    StateSummary,
+    EvaluatorResult,
+    EvaluatorErrorAggregation,
+    ErrorDetail
+)
 
-    def evaluate(self, target_dir: str = ".") -> Dict[str, Any]:
-        ...
 
-def get_default_evaluators() -> List[EvaluatorProtocol]:
+def get_default_evaluators() -> List[BaseEvaluator]:
     from gama.evaluators import security, db_stress, auth_check, ui_ux
     return [
         security.SecurityEvaluator(),
@@ -26,17 +27,17 @@ class StateManager:
     """
     Core state manager that runs evaluators sequentially, tracks pass/fail counts,
     gathers granular error details, and aggregates them into a unified,
-    code-health state context dictionary.
+    code-health state context strictly typed with Pydantic.
     """
     def __init__(self):
         self.pass_count = 0
         self.fail_count = 0
-        self.error_details = []
-        self.evaluator_results = {}
+        self.error_details: List[EvaluatorErrorAggregation] = []
+        self.evaluator_results: Dict[str, EvaluatorResult] = {}
 
-    def run(self, evaluators: Optional[List[EvaluatorProtocol]] = None, target_dir: str = ".") -> Dict[str, Any]:
+    def run(self, evaluators: Optional[List[BaseEvaluator]] = None, target_dir: str = ".") -> StateContext:
         """
-        Runs all provided evaluators sequentially. If none provided, instantiates the 4 default evaluators.
+        Runs all provided evaluators sequentially. If none provided, instantiates the default evaluators.
         """
         if evaluators is None:
             evaluators = get_default_evaluators()
@@ -45,54 +46,64 @@ class StateManager:
         self.fail_count = 0
         self.error_details = []
         self.evaluator_results = {}
+        target_path = Path(target_dir)
 
         for evaluator in evaluators:
             try:
-                result = evaluator.evaluate(target_dir=target_dir)
+                result = evaluator.evaluate(target_dir=target_path)
             except Exception as e:
-                result = {
-                    "passed": False,
-                    "errors": [{"description": f"Unhandled exception in evaluator: {str(e)}", "title": "Evaluator Crash", "category": "Internal"}],
-                }
-
-            passed = result.get("passed", False)
-            errors = result.get("errors", [])
+                result = EvaluatorResult(
+                    passed=False,
+                    errors=[
+                        ErrorDetail(
+                            issue="Evaluator Crash",
+                            title="Evaluator Crash",
+                            description=f"Unhandled exception in evaluator: {str(e)}",
+                            instructions="Check evaluator implementation.",
+                            severity="Critical"
+                        )
+                    ]
+                )
 
             self.evaluator_results[evaluator.name] = result
 
-            if passed:
+            if result.passed:
                 self.pass_count += 1
             else:
                 self.fail_count += 1
-                if errors:
-                    self.error_details.append({
-                        "evaluator": evaluator.name,
-                        "errors": errors
-                    })
+                if result.errors:
+                    self.error_details.append(
+                        EvaluatorErrorAggregation(
+                            evaluator=evaluator.name,
+                            errors=result.errors
+                        )
+                    )
 
         total = self.pass_count + self.fail_count
         success_rate = (self.pass_count / total) if total > 0 else 1.0
 
-        state_context = {
-            "summary": {
-                "total": total,
-                "passed": self.pass_count,
-                "failed": self.fail_count,
-                "success_rate": round(success_rate, 4),
-            },
-            "evaluator_results": self.evaluator_results,
-            "aggregated_errors": self.error_details,
-            "overall_status": "PASSED" if self.fail_count == 0 and total > 0 else "FAILED" if total > 0 else "NO_EVALUATORS",
-            "timestamp": time.time()
-        }
+        summary = StateSummary(
+            total=total,
+            passed=self.pass_count,
+            failed=self.fail_count,
+            success_rate=round(success_rate, 4)
+        )
 
-        return state_context
+        overall_status = "PASSED" if self.fail_count == 0 and total > 0 else "FAILED" if total > 0 else "NO_EVALUATORS"
 
-def generate_state_markdown(state_context: Dict[str, Any]) -> str:
+        return StateContext(
+            summary=summary,
+            evaluator_results=self.evaluator_results,
+            aggregated_errors=self.error_details,
+            overall_status=overall_status,
+            timestamp=time.time()
+        )
+
+def generate_state_markdown(state_context: StateContext) -> str:
     """
-    Generates a beautifully written Markdown state instruction file from the state context.
+    Generates a beautifully written Markdown state instruction file from the StateContext model.
     """
-    if state_context.get("overall_status") == "PASSED":
+    if state_context.overall_status == "PASSED":
         return (
             "# Gama State Report\n\n"
             "## All Systems Go\n\n"
@@ -105,27 +116,23 @@ def generate_state_markdown(state_context: Dict[str, Any]) -> str:
     md += "---\n\n"
 
     issue_count = 1
-    for err_info in state_context.get("aggregated_errors", []):
-        evaluator_name = err_info.get("evaluator", "Unknown Evaluator")
-        for failure in err_info.get("errors", []):
-            if isinstance(failure, str):
-                failure = {"description": failure, "title": "Failure", "category": evaluator_name}
-
-            md += f"## Issue {issue_count}: {failure.get('title', 'Unknown Failure')}\n\n"
-            md += f"**Category:** {failure.get('category', evaluator_name)}\n"
-            md += f"**Severity:** {failure.get('severity', 'High')}\n\n"
+    for err_info in state_context.aggregated_errors:
+        evaluator_name = err_info.evaluator
+        for failure in err_info.errors:
+            md += f"## Issue {issue_count}: {failure.title}\n\n"
+            md += f"**Category:** {evaluator_name}\n"
+            md += f"**Severity:** {failure.severity}\n\n"
 
             md += "### Description\n"
-            desc = failure.get('description', 'No description provided.')
-            md += f"{desc}\n\n"
+            md += f"{failure.description}\n\n"
 
             md += "### Required Action (Instructions for Agent)\n"
-            md += f"> {failure.get('instructions', 'Please investigate and fix the issue.')}\n\n"
+            md += f"> {failure.instructions}\n\n"
 
-            if 'file' in failure:
-                md += f"**Target File:** `{failure['file']}`\n"
-                if 'line' in failure:
-                    md += f"**Target Line:** {failure['line']}\n"
+            if failure.file:
+                md += f"**Target File:** `{failure.file}`\n"
+                if failure.line:
+                    md += f"**Target Line:** {failure.line}\n"
             md += "\n---\n\n"
             issue_count += 1
 
@@ -156,6 +163,7 @@ class ChangeHandler(FileSystemEventHandler):
 def watch_and_wait(target_dir: str):
     """
     Uses watchdog to monitor the target_dir and blocks execution until a file change is detected.
+    Adds a short grace period after detecting a file change to ensure IO locks are cleared before re-evaluating.
     """
     print(f"Watching for changes in: {target_dir}")
 
@@ -167,6 +175,11 @@ def watch_and_wait(target_dir: str):
     try:
         while not event_handler.change_detected:
             time.sleep(1)
+
+        # Grace period for async IO safety
+        print("Change detected. Waiting 1s for file locks to clear...")
+        time.sleep(1)
+
     except KeyboardInterrupt:
         observer.stop()
         raise
@@ -174,9 +187,9 @@ def watch_and_wait(target_dir: str):
         observer.stop()
         observer.join()
 
-    print("Change detected. Resuming loop...")
+    print("Resuming loop...")
 
-def run_loop(target_dir: str, evaluators: Optional[List[EvaluatorProtocol]] = None):
+def run_loop(target_dir: str, evaluators: Optional[List[BaseEvaluator]] = None):
     """
     Implements the continuous testing loop.
     Repeatedly evaluates the project, writes the state file, and waits for changes if there are failures.
@@ -193,7 +206,7 @@ def run_loop(target_dir: str, evaluators: Optional[List[EvaluatorProtocol]] = No
         markdown_content = generate_state_markdown(state_context)
         write_state_file(markdown_content)
 
-        if state_context.get("overall_status") == "PASSED":
+        if state_context.overall_status == "PASSED":
             print("No failures detected. Exiting loop.")
             break
 
