@@ -1,36 +1,42 @@
 import os
 import pytest
 from gama.reporter import generate_audit_report
+from gama.schema import StateContext, StateSummary, EvaluatorResult, EvaluatorErrorAggregation, ErrorDetail
 
 def test_generate_audit_report(tmp_path):
-    # Dummy markdown content with headers, paragraphs, lists, and blockquotes
-    markdown_content = """# Certification Report
+    # Dummy StateContext Pydantic object
+    state_context = StateContext(
+        summary=StateSummary(
+            total=4,
+            passed=3,
+            failed=1,
+            success_rate=0.75
+        ),
+        evaluator_results={
+            "Test Evaluator": EvaluatorResult(passed=False, errors=[])
+        },
+        aggregated_errors=[
+            EvaluatorErrorAggregation(
+                evaluator="Test Evaluator",
+                errors=[
+                    ErrorDetail(
+                        issue="Test Issue",
+                        title="Test Failure",
+                        description="This is a test error description.",
+                        instructions="Fix the test error.",
+                        severity="High"
+                    )
+                ]
+            )
+        ],
+        overall_status="FAILED",
+        timestamp=1234567890.0
+    )
 
-## Introduction
-This is a **test** report to certify the software codebase.
-
-## Findings
-The system identified the following structural elements:
-- Database connectivity is solid.
-- Authentication chains are valid.
-- Security protocols active.
-- UI/UX passes automated visual tests.
-
-## Additional Details
-1. Step one is verification.
-2. Step two is certification.
-3. Step three is deployment.
-
-> This report is generated autonomously by Gama.
-
-Code reference: `import gama`
-
-End of report.
-"""
     output_pdf = tmp_path / "test_report.pdf"
 
     # Generate the PDF
-    generate_audit_report(markdown_content, str(output_pdf))
+    generate_audit_report(state_context, str(output_pdf))
 
     # Assert PDF was created and has content
     assert os.path.exists(output_pdf)

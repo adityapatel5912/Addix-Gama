@@ -1,34 +1,42 @@
 import pytest
 import os
-from gama.loop import StateManager, EvaluatorProtocol
+from pathlib import Path
+from gama.loop import StateManager
+from gama.evaluators import BaseEvaluator
+from gama.schema import EvaluatorResult, ErrorDetail, StateContext
 
-class MockPassEvaluator:
+class MockPassEvaluator(BaseEvaluator):
     @property
     def name(self):
         return "PassEvaluator"
 
-    def evaluate(self, target_dir="."):
-        return {"passed": True, "errors": []}
+    def evaluate(self, target_dir: Path) -> EvaluatorResult:
+        return EvaluatorResult(passed=True, errors=[])
 
-class MockFailEvaluator:
+class MockFailEvaluator(BaseEvaluator):
     @property
     def name(self):
         return "FailEvaluator"
 
-    def evaluate(self, target_dir="."):
-        return {
-            "passed": False,
-            "errors": [
-                {"description": "A terrible error occurred", "title": "Failure", "category": "General"}
+    def evaluate(self, target_dir: Path) -> EvaluatorResult:
+        return EvaluatorResult(
+            passed=False,
+            errors=[
+                ErrorDetail(
+                    issue="General Failure",
+                    title="Failure",
+                    description="A terrible error occurred",
+                    instructions="Fix the failure"
+                )
             ]
-        }
+        )
 
-class MockExceptionEvaluator:
+class MockExceptionEvaluator(BaseEvaluator):
     @property
     def name(self):
         return "ExceptionEvaluator"
 
-    def evaluate(self, target_dir="."):
+    def evaluate(self, target_dir: Path) -> EvaluatorResult:
         raise RuntimeError("Something went horribly wrong")
 
 def test_state_manager_all_pass():
@@ -37,11 +45,12 @@ def test_state_manager_all_pass():
 
     state_context = manager.run(evaluators)
 
-    assert state_context["summary"]["total"] == 2
-    assert state_context["summary"]["passed"] == 2
-    assert state_context["summary"]["failed"] == 0
-    assert state_context["overall_status"] == "PASSED"
-    assert len(state_context["aggregated_errors"]) == 0
+    assert isinstance(state_context, StateContext)
+    assert state_context.summary.total == 2
+    assert state_context.summary.passed == 2
+    assert state_context.summary.failed == 0
+    assert state_context.overall_status == "PASSED"
+    assert len(state_context.aggregated_errors) == 0
 
 def test_state_manager_mixed_results():
     manager = StateManager()
@@ -49,17 +58,17 @@ def test_state_manager_mixed_results():
 
     state_context = manager.run(evaluators)
 
-    assert state_context["summary"]["total"] == 2
-    assert state_context["summary"]["passed"] == 1
-    assert state_context["summary"]["failed"] == 1
-    assert state_context["summary"]["success_rate"] == 0.5
-    assert state_context["overall_status"] == "FAILED"
+    assert state_context.summary.total == 2
+    assert state_context.summary.passed == 1
+    assert state_context.summary.failed == 1
+    assert state_context.summary.success_rate == 0.5
+    assert state_context.overall_status == "FAILED"
 
-    assert len(state_context["aggregated_errors"]) == 1
-    error_detail = state_context["aggregated_errors"][0]
-    assert error_detail["evaluator"] == "FailEvaluator"
-    assert len(error_detail["errors"]) == 1
-    assert "A terrible error occurred" in error_detail["errors"][0]["description"]
+    assert len(state_context.aggregated_errors) == 1
+    error_detail = state_context.aggregated_errors[0]
+    assert error_detail.evaluator == "FailEvaluator"
+    assert len(error_detail.errors) == 1
+    assert "A terrible error occurred" in error_detail.errors[0].description
 
 def test_state_manager_with_exception():
     manager = StateManager()
@@ -67,20 +76,20 @@ def test_state_manager_with_exception():
 
     state_context = manager.run(evaluators)
 
-    assert state_context["summary"]["total"] == 1
-    assert state_context["summary"]["passed"] == 0
-    assert state_context["summary"]["failed"] == 1
-    assert state_context["overall_status"] == "FAILED"
+    assert state_context.summary.total == 1
+    assert state_context.summary.passed == 0
+    assert state_context.summary.failed == 1
+    assert state_context.overall_status == "FAILED"
 
-    assert len(state_context["aggregated_errors"]) == 1
-    error_detail = state_context["aggregated_errors"][0]
-    assert error_detail["evaluator"] == "ExceptionEvaluator"
-    assert "Unhandled exception" in error_detail["errors"][0]["description"]
+    assert len(state_context.aggregated_errors) == 1
+    error_detail = state_context.aggregated_errors[0]
+    assert error_detail.evaluator == "ExceptionEvaluator"
+    assert "Unhandled exception" in error_detail.errors[0].description
 
 def test_state_manager_empty_evaluators():
     manager = StateManager()
     state_context = manager.run([])
 
-    assert state_context["summary"]["total"] == 0
-    assert state_context["summary"]["passed"] == 0
-    assert state_context["overall_status"] == "NO_EVALUATORS"
+    assert state_context.summary.total == 0
+    assert state_context.summary.passed == 0
+    assert state_context.overall_status == "NO_EVALUATORS"
