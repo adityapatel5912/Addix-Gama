@@ -1,0 +1,35 @@
+{
+  "name": "addix-gama",
+  "version": "1.0.0",
+  "description": "Autonomous continuous-testing and validation engine designed to stress-test software repositories.",
+  "tools": [
+    {
+      "name": "scan",
+      "description": "Runs one-off checks across core production vectors.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "loop",
+      "description": "Starts the automated repair cycle.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "report",
+      "description": "Generates the final audit document.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    }
+  ],
+  "start": "python -m gama.api"
+}
