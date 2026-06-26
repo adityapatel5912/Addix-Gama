@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+gama_state.md
+gama_audit_report.pdf
