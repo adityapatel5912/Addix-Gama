@@ -1,9 +1,12 @@
-from typer.testing import CliRunner
-from gama.cli import app
 from unittest.mock import patch
+
+from typer.testing import CliRunner
+
+from gama.cli import app
 from gama.schema import StateContext, StateSummary
 
 runner = CliRunner()
+
 
 def dummy_state_context(status="PASSED"):
     return StateContext(
@@ -11,8 +14,9 @@ def dummy_state_context(status="PASSED"):
         evaluator_results={},
         aggregated_errors=[],
         overall_status=status,
-        timestamp=123.0
+        timestamp=123.0,
     )
+
 
 @patch("gama.cli.StateManager.run")
 def test_scan(mock_run):
@@ -21,11 +25,13 @@ def test_scan(mock_run):
     assert result.exit_code == 0
     assert "Scanning Database..." in result.stdout
 
+
 @patch("gama.cli.run_loop")
 def test_loop(mock_run_loop):
     result = runner.invoke(app, ["loop"])
     assert result.exit_code == 0
     assert "Assessing current state..." in result.stdout
+
 
 @patch("gama.cli.StateManager.run")
 @patch("gama.cli.generate_audit_report")

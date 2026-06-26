@@ -1,9 +1,12 @@
-import pytest
 import os
 from pathlib import Path
-from gama.loop import StateManager
+
+import pytest
+
 from gama.evaluators import BaseEvaluator
-from gama.schema import EvaluatorResult, ErrorDetail, StateContext
+from gama.loop import StateManager
+from gama.schema import ErrorDetail, EvaluatorResult, StateContext
+
 
 class MockPassEvaluator(BaseEvaluator):
     @property
@@ -12,6 +15,7 @@ class MockPassEvaluator(BaseEvaluator):
 
     def evaluate(self, target_dir: Path) -> EvaluatorResult:
         return EvaluatorResult(passed=True, errors=[])
+
 
 class MockFailEvaluator(BaseEvaluator):
     @property
@@ -26,10 +30,11 @@ class MockFailEvaluator(BaseEvaluator):
                     issue="General Failure",
                     title="Failure",
                     description="A terrible error occurred",
-                    instructions="Fix the failure"
+                    instructions="Fix the failure",
                 )
-            ]
+            ],
         )
+
 
 class MockExceptionEvaluator(BaseEvaluator):
     @property
@@ -38,6 +43,7 @@ class MockExceptionEvaluator(BaseEvaluator):
 
     def evaluate(self, target_dir: Path) -> EvaluatorResult:
         raise RuntimeError("Something went horribly wrong")
+
 
 def test_state_manager_all_pass():
     manager = StateManager()
@@ -51,6 +57,7 @@ def test_state_manager_all_pass():
     assert state_context.summary.failed == 0
     assert state_context.overall_status == "PASSED"
     assert len(state_context.aggregated_errors) == 0
+
 
 def test_state_manager_mixed_results():
     manager = StateManager()
@@ -70,6 +77,7 @@ def test_state_manager_mixed_results():
     assert len(error_detail.errors) == 1
     assert "A terrible error occurred" in error_detail.errors[0].description
 
+
 def test_state_manager_with_exception():
     manager = StateManager()
     evaluators = [MockExceptionEvaluator()]
@@ -85,6 +93,7 @@ def test_state_manager_with_exception():
     error_detail = state_context.aggregated_errors[0]
     assert error_detail.evaluator == "ExceptionEvaluator"
     assert "Unhandled exception" in error_detail.errors[0].description
+
 
 def test_state_manager_empty_evaluators():
     manager = StateManager()
