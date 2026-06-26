@@ -1,16 +1,43 @@
+"""
+Module documentation.
+"""
+
+import logging
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
-from gama.loop import run_loop, StateManager, generate_state_markdown, write_state_file, get_default_evaluators
+
+from gama.loop import (
+    StateManager,
+    generate_state_markdown,
+    get_default_evaluators,
+    run_loop,
+    write_state_file,
+)
 from gama.reporter import generate_audit_report
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
 
 app = typer.Typer(help="Gama CLI - Autonomous Continuous-Testing Engine")
 console = Console()
 
+
 @app.command()
 def scan():
     """Runs one-off checks across core production vectors."""
-    console.print(Panel.fit("[bold green]Starting Gama Scan...[/bold green]", title="Gama"))
+    console.print(
+        Panel.fit("[bold green]Starting Gama Scan...[/bold green]", title="Gama")
+    )
     console.print("Scanning Database...")
     console.print("Scanning OAuth...")
     console.print("Scanning Security...")
@@ -26,10 +53,15 @@ def scan():
 
     console.print("[bold blue]Scan complete.[/bold blue]")
 
+
 @app.command()
 def loop():
     """Starts the automated repair cycle."""
-    console.print(Panel.fit("[bold yellow]Initiating Gama Repair Loop...[/bold yellow]", title="Gama"))
+    console.print(
+        Panel.fit(
+            "[bold yellow]Initiating Gama Repair Loop...[/bold yellow]", title="Gama"
+        )
+    )
     console.print("Assessing current state...")
 
     evaluators = get_default_evaluators()
@@ -37,10 +69,15 @@ def loop():
 
     console.print("[bold blue]Loop cycle complete.[/bold blue]")
 
+
 @app.command()
 def report():
     """Generates the final audit document."""
-    console.print(Panel.fit("[bold magenta]Generating Gama Report...[/bold magenta]", title="Gama"))
+    console.print(
+        Panel.fit(
+            "[bold magenta]Generating Gama Report...[/bold magenta]", title="Gama"
+        )
+    )
     console.print("Compiling audit data...")
 
     evaluators = get_default_evaluators()
@@ -53,6 +90,7 @@ def report():
 
     console.print("Creating PDF report...")
     console.print("[bold blue]Report generated successfully.[/bold blue]")
+
 
 if __name__ == "__main__":
     app()

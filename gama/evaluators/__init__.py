@@ -1,6 +1,23 @@
+"""
+Module documentation.
+"""
+
+import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
+
 from gama.schema import EvaluatorResult
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
 
 class BaseEvaluator(ABC):
     """

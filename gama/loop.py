@@ -1,27 +1,30 @@
 import time
-from typing import List, Dict, Any, Optional
 from pathlib import Path
-from watchdog.observers import Observer
+from typing import Any, Dict, List, Optional
+
 from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
 from gama.evaluators import BaseEvaluator
 from gama.schema import (
+    ErrorDetail,
+    EvaluatorErrorAggregation,
+    EvaluatorResult,
     StateContext,
     StateSummary,
-    EvaluatorResult,
-    EvaluatorErrorAggregation,
-    ErrorDetail
 )
 
 
 def get_default_evaluators() -> List[BaseEvaluator]:
-    from gama.evaluators import security, db_stress, auth_check, ui_ux
+    from gama.evaluators import auth_check, db_stress, security, ui_ux
+
     return [
         security.SecurityEvaluator(),
         db_stress.DBStressEvaluator(),
         auth_check.AuthEvaluator(),
-        ui_ux.UIUXEvaluator()
+        ui_ux.UIUXEvaluator(),
     ]
+
 
 class StateManager:
     """
@@ -29,13 +32,16 @@ class StateManager:
     gathers granular error details, and aggregates them into a unified,
     code-health state context strictly typed with Pydantic.
     """
+
     def __init__(self):
         self.pass_count = 0
         self.fail_count = 0
         self.error_details: List[EvaluatorErrorAggregation] = []
         self.evaluator_results: Dict[str, EvaluatorResult] = {}
 
-    def run(self, evaluators: Optional[List[BaseEvaluator]] = None, target_dir: str = ".") -> StateContext:
+    def run(
+        self, evaluators: Optional[List[BaseEvaluator]] = None, target_dir: str = "."
+    ) -> StateContext:
         """
         Runs all provided evaluators sequentially. If none provided, instantiates the default evaluators.
         """
@@ -60,9 +66,9 @@ class StateManager:
                             title="Evaluator Crash",
                             description=f"Unhandled exception in evaluator: {str(e)}",
                             instructions="Check evaluator implementation.",
-                            severity="Critical"
+                            severity="Critical",
                         )
-                    ]
+                    ],
                 )
 
             self.evaluator_results[evaluator.name] = result
@@ -74,8 +80,7 @@ class StateManager:
                 if result.errors:
                     self.error_details.append(
                         EvaluatorErrorAggregation(
-                            evaluator=evaluator.name,
-                            errors=result.errors
+                            evaluator=evaluator.name, errors=result.errors
                         )
                     )
 
@@ -86,18 +91,23 @@ class StateManager:
             total=total,
             passed=self.pass_count,
             failed=self.fail_count,
-            success_rate=round(success_rate, 4)
+            success_rate=round(success_rate, 4),
         )
 
-        overall_status = "PASSED" if self.fail_count == 0 and total > 0 else "FAILED" if total > 0 else "NO_EVALUATORS"
+        overall_status = (
+            "PASSED"
+            if self.fail_count == 0 and total > 0
+            else "FAILED" if total > 0 else "NO_EVALUATORS"
+        )
 
         return StateContext(
             summary=summary,
             evaluator_results=self.evaluator_results,
             aggregated_errors=self.error_details,
             overall_status=overall_status,
-            timestamp=time.time()
+            timestamp=time.time(),
         )
+
 
 def generate_state_markdown(state_context: StateContext) -> str:
     """
@@ -140,6 +150,7 @@ def generate_state_markdown(state_context: StateContext) -> str:
     md += "Once the repairs have been applied, save the files. The Gama loop will automatically detect the changes and re-evaluate the repository.\n"
     return md
 
+
 def write_state_file(markdown_content: str, file_path: str = "gama_state.md"):
     """
     Writes the generated markdown content to the specified file path.
@@ -147,6 +158,7 @@ def write_state_file(markdown_content: str, file_path: str = "gama_state.md"):
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(markdown_content)
     print(f"State file written to {file_path}")
+
 
 class ChangeHandler(FileSystemEventHandler):
     def __init__(self):
@@ -159,6 +171,7 @@ class ChangeHandler(FileSystemEventHandler):
     def on_created(self, event):
         if not event.is_directory and "gama_state.md" not in event.src_path:
             self.change_detected = True
+
 
 def watch_and_wait(target_dir: str):
     """
@@ -189,6 +202,7 @@ def watch_and_wait(target_dir: str):
 
     print("Resuming loop...")
 
+
 def run_loop(target_dir: str, evaluators: Optional[List[BaseEvaluator]] = None):
     """
     Implements the continuous testing loop.
@@ -210,5 +224,7 @@ def run_loop(target_dir: str, evaluators: Optional[List[BaseEvaluator]] = None):
             print("No failures detected. Exiting loop.")
             break
 
-        print("Failures detected. Pausing and waiting for file changes to re-evaluate...")
+        print(
+            "Failures detected. Pausing and waiting for file changes to re-evaluate..."
+        )
         watch_and_wait(target_dir)
