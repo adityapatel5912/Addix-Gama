@@ -25,7 +25,7 @@ class DBStressEvaluator(BaseEvaluator):
         broken_db_pattern = re.compile(r'db\s*=\s*["\']broken_connection.*?["\']')
 
         for path in target_dir.rglob('*.py'):
-            if "tests" in str(path):
+            if "tests" in path.parts and "dummy_codebases" not in path.parts:
                 continue
 
             try:
