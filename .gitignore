@@ -4,3 +4,6 @@ __pycache__/
 *.pyc
 gama_state.md
 gama_audit_report.pdf
+venv/
+build/
+*.egg-info/

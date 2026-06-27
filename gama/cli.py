@@ -54,5 +54,8 @@ def report():
     console.print("Creating PDF report...")
     console.print("[bold blue]Report generated successfully.[/bold blue]")
 
-if __name__ == "__main__":
+def main():
     app()
+
+if __name__ == "__main__":
+    main()
