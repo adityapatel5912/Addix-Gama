@@ -31,7 +31,7 @@ class SecurityEvaluator(BaseEvaluator):
         password_pattern = re.compile(r'password\s*=\s*["\'][^"\']+["\']')
 
         for path in target_dir.rglob('*.py'):
-            if "tests" in str(path):
+            if "tests" in path.parts and "dummy_codebases" not in path.parts:
                 continue
 
             try:

@@ -8,7 +8,7 @@ app = typer.Typer(help="Gama CLI - Autonomous Continuous-Testing Engine")
 console = Console()
 
 @app.command()
-def scan():
+def scan(target: str = typer.Option(".", "--target", help="Target directory to scan")):
     """Runs one-off checks across core production vectors."""
     console.print(Panel.fit("[bold green]Starting Gama Scan...[/bold green]", title="Gama"))
     console.print("Scanning Database...")
@@ -19,7 +19,7 @@ def scan():
     evaluators = get_default_evaluators()
 
     state_manager = StateManager()
-    state_context = state_manager.run(evaluators)
+    state_context = state_manager.run(evaluators, target_dir=target)
 
     markdown_content = generate_state_markdown(state_context)
     write_state_file(markdown_content)
@@ -38,7 +38,7 @@ def loop():
     console.print("[bold blue]Loop cycle complete.[/bold blue]")
 
 @app.command()
-def report():
+def report(state: str = typer.Option("gama_state.md", "--state", help="State markdown file"), output: str = typer.Option("gama_audit_report.pdf", "--output", help="Output PDF file"), target: str = typer.Option(".", "--target", help="Target directory to report")):
     """Generates the final audit document."""
     console.print(Panel.fit("[bold magenta]Generating Gama Report...[/bold magenta]", title="Gama"))
     console.print("Compiling audit data...")
@@ -46,10 +46,10 @@ def report():
     evaluators = get_default_evaluators()
 
     state_manager = StateManager()
-    state_context = state_manager.run(evaluators)
+    state_context = state_manager.run(evaluators, target_dir=target)
 
     # Pass the Pydantic StateContext model directly
-    generate_audit_report(state_context, "gama_audit_report.pdf")
+    generate_audit_report(state_context, output)
 
     console.print("Creating PDF report...")
     console.print("[bold blue]Report generated successfully.[/bold blue]")

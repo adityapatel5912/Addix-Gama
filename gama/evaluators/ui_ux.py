@@ -15,7 +15,7 @@ class UIUXEvaluator(BaseEvaluator):
         extensions_to_check = {'.js', '.jsx', '.ts', '.tsx', '.html'}
 
         for path in target_dir.rglob('*'):
-            if "tests" in str(path):
+            if "tests" in path.parts and "dummy_codebases" not in path.parts:
                 continue
             if path.is_file() and path.suffix in extensions_to_check:
                 try:
